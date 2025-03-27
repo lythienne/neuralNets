@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 /**
@@ -7,12 +9,13 @@ import java.util.Scanner;
  * Parser takes in one line of the config file and extracts its value
  * 
  * Table of Contents:
- *    static String cleanString(String string)
- *    static boolean setString(String line)
- *    static int extractInt()
- *    static int extractDouble()
- *    static int extractBoolean()
- *    static int extractString()
+ *    cleanString(String)
+ *    setString(String)
+ *    extractConnectivityPattern()
+ *    extractInt()
+ *    extractDouble()
+ *    extractBoolean()
+ *    extractString()
  */
 class Parser
 {
@@ -39,7 +42,7 @@ class Parser
 
       try
       {
-         value = line.substring(line.indexOf("=") + 1, line.indexOf(";"));    //+1 so the value is only whats within the parentheses
+         value = line.substring(line.indexOf("=") + 1, line.indexOf(";"));    // + 1 to skip the space
          value = value.strip();
       }
       catch (IndexOutOfBoundsException e)
@@ -49,6 +52,31 @@ class Parser
 
       return valueFound;
    } // boolean setString(String line)
+
+/**
+ * Extracts the connectivity pattern from the line in the config file
+ */
+   static int[] extractConnectivityPattern()
+   {
+      List<Integer> connectivity = new ArrayList<Integer>();
+      int dashIndex = value.indexOf("-");
+      while (dashIndex > -1)
+      {
+         connectivity.add(Integer.parseInt(value.substring(0, dashIndex)));
+
+         value = value.substring(dashIndex + 1);         //+ 1 to skip the dash
+         dashIndex = value.indexOf("-");
+      }
+      connectivity.add(Integer.parseInt(value));
+
+      int[] connectivityArray = new int[connectivity.size()];
+      for (int index = 0; index < connectivity.size(); index++)
+      {
+         connectivityArray[index] = connectivity.get(index);
+      }
+
+      return connectivityArray;
+   }
 
 /**
  * Extracts the integer from the line in the config file

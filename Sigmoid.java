@@ -5,9 +5,9 @@
  * Sigmoid represents a sigmoid activation function
  * 
  * Table of Contents:
- *    double F(double x);
- *    double deriv(double x);
- *    String getName();
+ *    F(double);
+ *    deriv(double);
+ *    getName();
  */
 class Sigmoid extends ActivationFunction
 {

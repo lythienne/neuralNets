@@ -11,71 +11,71 @@ import java.util.Scanner;
  * Author: Harrison Chen
  * Date of Creation: 1/24/24
  * 
- * The ABCDNetwork class is an A-B-C-D multilayer perceptron with backpropagation.
+ * The NLayerNetwork class is an n-layer multilayer perceptron with backpropagation.
  * 
  * Table of Contents:
- *    void setConfigurationParameters(String configFile)
- *       void parseLine(String line)
- *    void echoConfigurationParameters()
- *       void echoValidateLoadWeights() throws FileNotFoundException, IOException
- *    void allocateMemory()
- *    void populateArrays()
- *       void populateWeightsManually()
- *       void saveWeights()
- *       void loadWeights()
- *       void AB1populateTruthTable()
- *       void ABCpopulateTruthTable()
- *       void AB1populateTestCases()
- *       void populateTruthTable()
- *       void populateTestCases()
- *       double randomize(double low, double high)
- *    void trainOrRun()
- *       void runTestCaseWithoutSaving(int testCase)
- *       void runTestCase(int testCase)
- *       void populateInputNodes(int testCase)
- *       void calculateGradientDescent(int testCase)
- *       double activationFunction(double x)
- *       double derivative(double x)
- *    void reportResults()
- *       void reportTrainingInformation()
- *       void reportOutputs()
- *       void reportTruthTable()
- *       void reportWeights()
- *       String format(double number)
- *    public static void main(String[] args)
- *       static void runNetwork(String configFile)
+ *    setConfigurationParameters(String)
+ *       parseLine(String)
+ *    echoConfigurationParameters()
+ *       echoValidateLoadWeights()
+ *    allocateMemory()
+ *    populateArrays()
+ *       populateWeightsManually()
+ *       saveWeights()
+ *       loadWeights()
+ *       AB1populateTruthTable()
+ *       AB1populateTestCases()
+ *       populateTruthTable()
+ *       populateTestCases()
+ *       randomize(double, double)
+ *    trainOrRun()
+ *       runTestCaseWithoutSaving(int)
+ *       runTestCase(int)
+ *       populateInputNodes(int)
+ *       calculateGradientDescent(int)
+ *       activationFunction(double)
+ *       derivative(double)
+ *    reportResults()
+ *       reportTrainingInformation()
+ *       reportOutputs()
+ *       reportTruthTable()
+ *       reportWeights()
+ *       format(double)
+ *    main(String[])
+ *       runNetwork(String)
  */
-class ABCDNetwork
+class NLayerNetwork
 {
-   final static int LAYERS = 3;                       //number of layers in the network
-   final static int A = 0;                            //n-index of the input layer
-   final static int H1 = 1;                           //n-index of the first hidden layer
-   final static int H2 = 2;                           //n-index of the second hidden layer
-   final static int F = 3;                            //n-index of the output layer
-
-   final static int AND = 0;                          //tests the network against AND
-   final static int OR = 1;                           //tests the network against OR
-   final static int XOR = 2;                          //tests the network against XOR
+   final static int A = 0;                            //layer of the input layer
 
    final static int RANDOMIZE = 0;                    //randomly populates the weights
    final static int TWO_TWO_ONE = 1;                  //populates the weights with preset values for a 2-2-1 network
    final static int LOAD_FROM_FILE = 2;               //populates the weights from a file
 
    final static int[] PRESET_MODEL = {2, 2, 1};       //array constant that saves a 2-2-1 model to be checked against
-   final static int a_LAYER_INDEX = 0;                //index of the number of input nodes in the preset model
-   final static int h_LAYER_INDEX = 1;                //index of the number of hidden nodes in the preset model
-   final static int F_LAYER_INDEX = 2;                //index of the number of final node in the preset model
+   final static int PRESET_LAYERS = 2;                //number of layers in the preset model
+   final static int PRESET_A_INDEX = 0;               //index of the number of input nodes in the preset model
+   final static int PRESET_H_INDEX = 1;               //index of the number of hidden nodes in the preset model
+   final static int PRESET_F_INDEX = 2;               //index of the number of final node in the preset model
 
    final static int a0INDEX = 0;                      //index of the first input value in the test cases array
    final static int a1INDEX = 1;                      //index of the second input value in the test cases array
 
+   final static double MS_THRESHOLD = 1.0;            //if the number of seconds is less than one then print in milliseconds
+   final static double MS_PER_SEC = 1000.0;           //number of milliseconds per second
+   final static double SEC_PER_MIN = 60.0;            //number of seconds per minute
+   final static double MIN_PER_HR = 60.0;             //number of minutes per hour
+   final static double HR_PER_DAY = 24.0;             //number of hours per day
+   final static double DAY_PER_WK = 7.0;              //number of days per week
+
    final static int MAX_WEIGHT_STRING_LENGTH = 24;    //the maximum length the weight can be when printed so that they all line up
 
-   int aNodes;                   //no, this is not a chemistry class unfortunately, a nodes is the number of nodes in the input layer
-   int h1Nodes;                  //number of nodes in the first hidden layer
-   int h2Nodes;                  //number of nodes in the second hidden layer
-   int FNodes;                   //number of nodes in the output layer
+   int layers;                   //number of network (connectivity) layers
+   int nodeLayers;               //number of node layers
 
+   int F;                        //index of the output layer
+
+   int[] numNodes;               //number of nodes in each layer
    double[][] a;                 //2d array for all the activations in the network
 
    boolean train;                //whether to train (true) or run (false)
@@ -101,6 +101,9 @@ class ABCDNetwork
    int iterations;               //number of iterations in the current training session
    double avgError;              //average error from the previous iteration
 
+   int keepAlive;                //number of iterations after which to print a keep-alive message
+   boolean printKeepAlives;      //whether or not to print keep-alive messages
+
    double[][] testCases;         //2d array to store the inputs for each test case
    double[][] truth;             //2d array to store the truth values for each test case
 
@@ -118,7 +121,7 @@ class ABCDNetwork
    String inputsFile;            //the file where the inputs are stored
 
 /**
- * The user should set their values for the configuration parameters (that can be changed) here.
+ * Values for the configuration parameters will be read from the config file here.
  */
    void setConfigurationParameters(String configFile)
    {
@@ -145,6 +148,9 @@ class ABCDNetwork
       {
          throw new ValidationError("File \""+configFile+"\" does not exist.");
       } // try catch (FileNotFoundException e)
+
+      nodeLayers = layers + 1;               //node layers is the number of connectivity layers plus one
+      F = layers;                            //index of the output layer is equal to the number of connectivity layers
    } // void setConfigurationParameters(String configFile)
 
 /**
@@ -154,10 +160,8 @@ class ABCDNetwork
    {
       switch (line)
       {
-         case "aNodes": aNodes = Parser.extractInt(); break;
-         case "h1Nodes": h1Nodes = Parser.extractInt(); break;
-         case "h2Nodes": h2Nodes = Parser.extractInt(); break;
-         case "FNodes": FNodes = Parser.extractInt(); break;
+         case "network": numNodes = Parser.extractConnectivityPattern(); break;
+         case "layers": layers = Parser.extractInt(); break;
 
          case "weightPopulation": 
             String weightPopulationString = Parser.extractString().toUpperCase();
@@ -195,6 +199,8 @@ class ABCDNetwork
          case "lambda": lambda = Parser.extractDouble(); break;
          case "maxIterations": maxIterations = Parser.extractInt(); break;
          case "errorThreshold": errorThreshold = Parser.extractDouble(); break;
+         case "keepAlive": keepAlive = Parser.extractInt(); break;
+         case "printKeepAlives" : printKeepAlives = Parser.extractBoolean(); break;
 
          case "randomLow": randomLow = Parser.extractDouble(); break;
          case "randomHigh": randomHigh = Parser.extractDouble(); break;
@@ -218,7 +224,21 @@ class ABCDNetwork
 
       System.out.println("-----------------------------------------------------------");
 
-      System.out.println("Configuration Parameters for a "+aNodes+"-"+h1Nodes+"-"+h2Nodes+"-"+FNodes+" network:\n");
+      if (nodeLayers != numNodes.length)     //use .length to check if number of layers matches the connectivity pattern in config
+      {
+         throw new ValidationError("'"+layers+"' connectivity layers/'"+nodeLayers+
+               "' node layers declared in config file does not match connectivity pattern.");
+      }
+
+      System.out.print("Configuration Parameters for a ");
+
+      System.out.print(numNodes[0]);         //print first element before looping to make it look nice
+      for (int n = 1; n < nodeLayers; n++)
+      {
+         System.out.print("-"+numNodes[n]);
+      }
+
+      System.out.print(" network:\n\n");
       
       System.out.println("Weight Population Method:");
       switch (weightPopulation)
@@ -230,8 +250,12 @@ class ABCDNetwork
                System.out.println("Randomizing weights from "+randomLow+" to "+randomHigh);
             break;
 
-         case TWO_TWO_ONE:    //deprecated, will always fail for ABCD networks, will reimplement in n-layer
-            throw new ValidationError("ABCD network cannot use 2-2-1 preset configuration as there are too many layers");
+         case TWO_TWO_ONE:
+            if (layers != PRESET_LAYERS || PRESET_MODEL[PRESET_A_INDEX] != numNodes[PRESET_A_INDEX]
+                     || PRESET_MODEL[PRESET_H_INDEX] != numNodes[PRESET_H_INDEX] 
+                     || PRESET_MODEL[PRESET_F_INDEX] != numNodes[PRESET_F_INDEX])
+               throw new ValidationError("Preset model selected and network connectivity pattern does not match preset 2-2-1 model.");
+            break;
 
          case LOAD_FROM_FILE:
             try
@@ -284,9 +308,13 @@ class ABCDNetwork
          System.out.println(" - Max Iterations: "+maxIterations);
          System.out.println(" - Error Threshold: "+errorThreshold);
          System.out.println(" - Lambda Value: "+lambda);
-      }
+         if (printKeepAlives)
+            System.out.println("\nPrinting keep-alives every "+keepAlive+" iterations.");
+      } // if (train)
       else
+      {
          System.out.println("Network is running");
+      } // if (train) else
 
       System.out.println("-----------------------------------------------------------"); //print a separator for clarity
    } // void echoConfigurationParameters()
@@ -302,20 +330,17 @@ class ABCDNetwork
 
       DataInputStream in = new DataInputStream(new FileInputStream(file));
 
-      int file_aNodes = (int) in.readDouble();     //reads the connectivity pattern from the saved weights file
-      int file_h1Nodes = (int) in.readDouble();
-      int file_h2Nodes = (int) in.readDouble();
-      int file_FNodes = (int) in.readDouble();
+      for (int n = 0; n < nodeLayers; n++)
+      {
+         int layerNnodes = (int) in.readDouble();
+         if (layerNnodes != numNodes[n])
+            throw new ValidationError("Saved number of nodes in layer "+n+": "+layerNnodes+
+               "' in weights file '"+loadWeightFile+"' does not match user set: "+numNodes[n]+" in config file");
+      } // for (int n = 0; n < nodeLayers; n++)
 
       in.close();
 
-      if (file_aNodes != aNodes || file_h1Nodes != h1Nodes || file_h2Nodes != h2Nodes || file_FNodes != FNodes)
-      {
-         throw new ValidationError("Saved connectivity pattern '"+file_aNodes+"-"+file_h1Nodes+"-"+file_h2Nodes+"-"+file_FNodes+
-               "' in weights file '"+loadWeightFile+"' does not match user set '"+aNodes+"-"+h1Nodes+"-"+h2Nodes+"-"+FNodes+"' in config file");
-      }
-
-      System.out.println("Loading '"+file_aNodes+"-"+file_h1Nodes+"-"+file_h2Nodes+"-"+file_FNodes+"' weights from '"+loadWeightFile+"'");
+      System.out.println("Loading weights from '"+loadWeightFile+"'");
    } // void echoValidateLoadWeights() throws FileNotFoundException, IOException
 
 /**
@@ -325,35 +350,30 @@ class ABCDNetwork
    {
       origin = "allocating memory for the arrays";
 
-      a = new double[LAYERS + 1][];                //number of activation layers is equal to the number of network layers + 1
-      a[A] = new double[aNodes];
-      a[H1] = new double[h1Nodes];
-      a[H2] = new double[h2Nodes];
-      a[F] = new double[FNodes];
+      a = new double[nodeLayers][];                //number of activation layers is equal to the number of network layers + 1
 
-      w = new double[LAYERS][][];
-      w[A] = new double[aNodes][h1Nodes];
-      w[H1] = new double[h1Nodes][h2Nodes];
-      w[H2] = new double[h2Nodes][FNodes];
+      for (int n = 0; n < nodeLayers; n++)
+         a[n] = new double[numNodes[n]];
 
-      truth = new double[numTestCases][FNodes];
-      testCases = new double[numTestCases][aNodes];
+      w = new double[layers][][];
 
-      outputs = new double[numTestCases][FNodes];
+      for (int n = 0; n < layers; n++)
+         w[n] = new double[numNodes[n]][numNodes[n+1]];
+
+      truth = new double[numTestCases][numNodes[F]];
+      testCases = new double[numTestCases][numNodes[A]];
+
+      outputs = new double[numTestCases][numNodes[F]];
 
       if (train)
       {
-         theta = new double[LAYERS + 1][];         //layers + 1 so the theta layer indexes align with their looping variable
-         theta[A] = new double[aNodes];
-         theta[H1] = new double[h1Nodes];
-         theta[H2] = new double[h2Nodes];
-         theta[F] = new double[FNodes];
+         theta = new double[nodeLayers][];          //thetas will be 1-indexed so the indexes match up
+         for (int n = 1; n < nodeLayers; n++)
+            theta[n] = new double[numNodes[n]];
 
-         psi = new double[LAYERS + 1][];           //psis will similarly be 1-indexed
-         psi[A] = new double[aNodes];
-         psi[H1] = new double[h1Nodes];
-         psi[H2] = new double[h2Nodes];
-         psi[F] = new double[FNodes];
+         psi = new double[nodeLayers][];            //psis will be 1-indexed so the indexes match up
+         for (int n = 1; n < nodeLayers; n++)
+            psi[n] = new double[numNodes[n]];
       } // if (train)
    } // void allocateMemory()
 
@@ -369,24 +389,15 @@ class ABCDNetwork
       switch (weightPopulation)
       {
          case RANDOMIZE:
-            for (int m = 0; m < aNodes; m++)
-               for (int k = 0; k < h1Nodes; k++)
-                  w[A][m][k] = randomize(randomLow, randomHigh);
-
-            for (int k = 0; k < h1Nodes; k++)
-               for (int j = 0; j < h2Nodes; j++)
-                  w[H1][k][j] = randomize(randomLow, randomHigh);
-
-            for (int j = 0; j < h2Nodes; j++)
-               for (int i = 0; i < FNodes; i++)
-                  w[H2][j][i] = randomize(randomLow, randomHigh);
+            for (int n = 0; n < layers; n++)
+               for (int m = 0; m < numNodes[n]; m++)
+                  for (int k = 0; k < numNodes[n + 1]; k++)
+                     w[n][m][k] = randomize(randomLow, randomHigh);
             break; // case RANDOMIZE:
             
          case LOAD_FROM_FILE: loadWeights(); break;
 
-         case TWO_TWO_ONE: 
-            throw new ValidationError("ABCD network cannot use 2-2-1 preset configuration, "+
-                  "also check your echo/validate since this should have been caught there");
+         case TWO_TWO_ONE: populateWeightsManually(); break;
 
          default:
             throw new ValidationError("Please select a valid weight population method, "+
@@ -398,7 +409,6 @@ class ABCDNetwork
 
    } // void populateArrays()
 
-@Deprecated
 /**
  * Manually populates weights for a 2-2-1 network into the weights arrays
  * 
@@ -406,13 +416,13 @@ class ABCDNetwork
  */
    void populateWeightsManually()
    {
-      w[A][0][0] = 0.2;
-      w[A][0][1] = 0.243;
-      w[A][1][0] = 0.1;
-      w[A][1][1] = 0.353;
+      w[PRESET_A_INDEX][0][0] = 0.2;
+      w[PRESET_A_INDEX][0][1] = 0.243;
+      w[PRESET_A_INDEX][1][0] = 0.1;
+      w[PRESET_A_INDEX][1][1] = 0.353;
 
-      w[H1][0][0] = 0.75;
-      w[H1][1][0] = 0.757;
+      w[PRESET_H_INDEX][0][0] = 0.75;
+      w[PRESET_H_INDEX][1][0] = 0.757;
 
    } // void populateWeightsManually()
 
@@ -426,22 +436,13 @@ class ABCDNetwork
          File file = new File(saveWeightFile);
          DataOutputStream out = new DataOutputStream(new FileOutputStream(file));
 
-         out.writeDouble(aNodes);
-         out.writeDouble(h1Nodes);
-         out.writeDouble(h2Nodes);
-         out.writeDouble(FNodes);
+         for (int n = 0; n < nodeLayers; n++)
+            out.writeDouble(numNodes[n]);
 
-         for (int m = 0; m < aNodes; m++)
-            for (int k = 0; k < h1Nodes; k++)
-               out.writeDouble(w[A][m][k]);
-
-         for (int k = 0; k < h1Nodes; k++)
-            for (int j = 0; j < h2Nodes; j++)
-               out.writeDouble(w[H1][k][j]);
-
-         for (int j = 0; j < h2Nodes; j++)
-            for (int i = 0; i < FNodes; i++)
-               out.writeDouble(w[H2][j][i]);
+         for (int n = 0; n < layers; n++)
+            for (int m = 0; m < numNodes[n]; m++)
+               for (int k = 0; k < numNodes[n + 1]; k++)
+                  out.writeDouble(w[n][m][k]);
          
          out.close();
       } // try
@@ -465,22 +466,13 @@ class ABCDNetwork
          File file = new File(loadWeightFile);
          DataInputStream in = new DataInputStream(new FileInputStream(file));
 
-         in.readDouble();     //skips four doubles which are the network connectivity model
-         in.readDouble();
-         in.readDouble();
-         in.readDouble();
+         for (int n = 0; n < nodeLayers; n++)      //skips the doubles which are the network connectivity model
+            in.readDouble();
 
-         for (int m = 0; m < aNodes; m++)
-            for (int k = 0; k < h1Nodes; k++)
-               w[A][m][k] = in.readDouble();
-
-         for (int k = 0; k < h1Nodes; k++)
-            for (int j = 0; j < h2Nodes; j++)
-               w[H1][k][j] = in.readDouble();
-
-         for (int j = 0; j < h2Nodes; j++)
-            for (int i = 0; i < FNodes; i++)
-               w[H2][j][i] = in.readDouble();
+         for (int n = 0; n < layers; n++)
+            for (int m = 0; m < numNodes[n]; m++)
+               for (int k = 0; k < numNodes[n + 1]; k++)
+                  w[n][m][k] = in.readDouble();
          
          in.close();
       } // try
@@ -506,28 +498,6 @@ class ABCDNetwork
       truth[3][0] = 0.0;
 
    } // void AB1populateTruthTable()
-
-@Deprecated
-/**
- * Manually populates the truth table with the current tests' (AND, OR, XOR) truth tables
- */
-   void ABCpopulateTruthTable()
-   {
-      truth[0][AND] = 0.0;
-      truth[1][AND] = 0.0;
-      truth[2][AND] = 0.0;
-      truth[3][AND] = 1.0;
-      
-      truth[0][OR] = 0.0;
-      truth[1][OR] = 1.0;
-      truth[2][OR] = 1.0;
-      truth[3][OR] = 1.0;
-
-      truth[0][XOR] = 0.0;
-      truth[1][XOR] = 1.0;
-      truth[2][XOR] = 1.0;
-      truth[3][XOR] = 0.0;
-   } // void ABCpopulateTruthTable()
 
 @Deprecated
 /**
@@ -558,7 +528,7 @@ class ABCDNetwork
          Scanner in = new Scanner(new File(truthTableFile));
 
          for (int testCase = 0; testCase < numTestCases; testCase++)
-            for (int i = 0; i < FNodes; i++)
+            for (int i = 0; i < numNodes[F]; i++)
                truth[testCase][i] = in.nextDouble();
 
          in.close();
@@ -579,7 +549,7 @@ class ABCDNetwork
          Scanner in = new Scanner(new File(inputsFile));
 
          for (int testCase = 0; testCase < numTestCases; testCase++)
-            for (int k = 0; k < aNodes; k++)
+            for (int k = 0; k < numNodes[A]; k++)
                testCases[testCase][k] = in.nextDouble();
 
          in.close();
@@ -599,7 +569,7 @@ class ABCDNetwork
    }
 
 /**
- * Trains or runs the neural network based on the user's selected mode. Activations are calculated with a sigmoid
+ * Trains or runs the neural network based on the user's selected mode. Activations are calculated with a user declared
  * activation function, while training uses gradient descent with changes in weights all applied simultaneously.
  */
    void trainOrRun()
@@ -623,7 +593,7 @@ class ABCDNetwork
 
                runTestCaseWithoutSaving(testCase);
 
-               for (int i = 0; i < FNodes; i++)
+               for (int i = 0; i < numNodes[F]; i++)
                {
                   double omega_i = truth[testCase][i] - a[F][i];
                   avgError += omega_i * omega_i / 2.0;
@@ -632,9 +602,13 @@ class ABCDNetwork
 
             iterations++;
             avgError /= (double) numTestCases;
+            
+            if (printKeepAlives && iterations % keepAlive == 0)
+               System.out.println("Iterations: "+iterations+", Error: "+avgError);
 
          } // while (iterations < maxIterations && error < maxAvgError)
       } // if (train)
+      
       for (int testCase = 0; testCase < numTestCases; testCase++)
       {
          populateInputNodes(testCase);
@@ -646,81 +620,69 @@ class ABCDNetwork
 
 /**
  * Runs the network for one test case, calculating the values of all the hidden nodes and the output node
- * does not save the dot products since they are not needed when only running
+ * does not save the thetas or psis since they are not needed when only running
  */
    void runTestCaseWithoutSaving(int testCase)
    {
       double theta;
 
-      for (int k = 0; k < h1Nodes; k++)              //iterate over the hidden nodes to calculate their values
+      for (int n = 1; n < layers; n++)    //layers is the number of node layers - 1 since we don't want to loop over the output layer twice
+      {
+         for (int k = 0; k < numNodes[n]; k++)
+         {
+            theta = 0.0;
+
+            for (int m = 0; m < numNodes[n - 1]; m++)
+               theta += a[n - 1][m] * w[n - 1][m][k];
+
+            a[n][k] = f.F(theta);
+         } // for (int k = 0; k < numNodes[n]; k++)
+      } // for (int n = 1; n < layers; n++)
+      
+      int n = F;
+      for (int k = 0; k < numNodes[n]; k++)
       {
          theta = 0.0;
 
-         for (int m = 0; m < aNodes; m++)           //iterate over the input nodes to calculate their dot product
-            theta += a[A][m] * w[A][m][k];
+         for (int m = 0; m < numNodes[n - 1]; m++)   //iterate over the hidden nodes to calculate their dot product
+            theta += a[n - 1][m] * w[n - 1][m][k];
 
-         a[H1][k] = f.F(theta);
-      } // for (int k = 0; k < h1Nodes; k++) 
-
-      for (int j = 0; j < h2Nodes; j++)              //iterate over the hidden nodes to calculate their values
-      {
-         theta = 0.0;
-
-         for (int k = 0; k < h1Nodes; k++)           //iterate over the input nodes to calculate their dot product
-            theta += a[H1][k] * w[H1][k][j];
-
-         a[H2][j] = f.F(theta);
-      } // for (int j = 0; j < h2Nodes; j++) 
-
-      for (int i = 0; i < FNodes; i++)
-      {
-         theta = 0.0;
-
-         for (int j = 0; j < h2Nodes; j++)            //iterate over the hidden nodes to calculate their dot product
-            theta += a[H2][j] * w[H2][j][i];
-
-         a[F][i] = f.F(theta);
-         outputs[testCase][i] = a[F][i];             //store output in outputs array to be later reported
-      } // for (int i = 0; i < FNodes; i++)
+         a[n][k] = f.F(theta);
+         outputs[testCase][k] = a[n][k];             //store output in outputs array to be later reported
+      } // for (int k = 0; k < numNodes[n]; k++)
    } // void runTestCaseWithoutSaving(int testCase)
 
 /**
- * Runs the network for one test case, saving the hidden and output node values, theta js, and psi is
+ * Runs the network for one test case, saving the hidden and output node values, thetas, and psis
  */
    void runTestCase(int testCase)
    {
-      for (int k = 0; k < h1Nodes; k++)              //iterate over the hidden nodes to calculate their values
+      for (int n = 1; n < layers; n++)
       {
-         theta[H1][k] = 0.0;
+         for (int k = 0; k < numNodes[n]; k++)
+         {
+            theta[n][k] = 0.0;
 
-         for (int m = 0; m < aNodes; m++)            //iterate over the input nodes to calculate their dot product
-            theta[H1][k] += a[A][m] * w[A][m][k];
+            for (int m = 0; m < numNodes[n - 1]; m++)
+               theta[n][k] += a[n - 1][m] * w[n - 1][m][k];
 
-         a[H1][k] = f.F(theta[H1][k]);
-      } // for (int k = 0; k < h1Nodes; k++) 
+            a[n][k] = f.F(theta[n][k]);
+         } // for (int k = 0; k < numNodes[n]; k++)
+      } // for (int n = 1; n < layers; n++)
 
-      for (int j = 0; j < h2Nodes; j++)
+      int n = F;
+      for (int k = 0; k < numNodes[n]; k++)
       {
-         theta[H2][j] = 0.0;
+         theta[n][k] = 0.0;
 
-         for (int k = 0; k < h1Nodes; k++)
-            theta[H2][j] += a[H1][k] * w[H1][k][j];
+         for (int m = 0; m < numNodes[n - 1]; m++)
+            theta[n][k] += a[n - 1][m] * w[n - 1][m][k];
 
-         a[H2][j] = f.F(theta[H2][j]);
-      } // for (int j = 0; j < h2Nodes; j++)
+         a[n][k] = f.F(theta[n][k]);
 
-      for (int i = 0; i < FNodes; i++)
-      {
-         theta[F][i] = 0.0;
-
-         for (int j = 0; j < h2Nodes; j++)
-            theta[F][i] += a[H2][j] * w[H2][j][i];
-
-         a[F][i] = f.F(theta[F][i]);
-         outputs[testCase][i] = a[F][i];
-
-         psi[F][i] = (truth[testCase][i] - a[F][i]) * f.deriv(theta[F][i]);
-      } // for (int i = 0; i < FNodes; i++)
+         outputs[testCase][k] = a[n][k];
+         psi[n][k] = (truth[testCase][k] - a[n][k]) * f.deriv(theta[n][k]);
+      } // for (int k = 0; k < numNodes[n]; k++)
    } // void runTestCase(int testCase)
 
 /**
@@ -728,7 +690,7 @@ class ABCDNetwork
  */
    void populateInputNodes(int testCase)
    {
-      for (int m = 0; m < aNodes; m++)
+      for (int m = 0; m < numNodes[A]; m++)
          a[A][m] = testCases[testCase][m];
    }
 
@@ -737,34 +699,38 @@ class ABCDNetwork
  */
    void calculateGradientDescent(int testCase)
    {
-      for (int j = 0; j < h2Nodes; j++)
+      for (int n = F - 1; n > 1; n--)           //start in second to last layer
+      {
+         for (int j = 0; j < numNodes[n]; j++)
+         {
+            double Omega_j = 0.0;               //initialize accumulator
+
+            for (int i = 0; i < numNodes[n + 1]; i++)
+            {
+               Omega_j += psi[n + 1][i] * w[n][j][i];
+               w[n][j][i] += lambda * a[n][j] * psi[n + 1][i];
+            }
+
+            psi[n][j] = Omega_j * f.deriv(theta[n][j]);
+         } // for (int j = 0; j < numNodes[n]; j++)
+      } // for (int n = F - 1; n > 1; n--)
+
+      int n = A + 1;
+      for (int j = 0; j < numNodes[n]; j++)
       {
          double Omega_j = 0.0;               //initialize accumulator
 
-         for (int i = 0; i < FNodes; i++)
+         for (int i = 0; i < numNodes[n + 1]; i++)
          {
-            Omega_j += psi[F][i] * w[H2][j][i];
-            w[H2][j][i] += lambda * a[H2][j] * psi[F][i];
+            Omega_j += psi[n + 1][i] * w[n][j][i];
+            w[n][j][i] += lambda * a[n][j] * psi[n + 1][i];
          }
 
-         psi[H2][j] = Omega_j * f.deriv(theta[H2][j]);
-      } // for (int j = 0; j < h2Nodes; j++)
-
-      for (int k = 0; k < h1Nodes; k++)
-      {
-         double Omega_k = 0.0;
-
-         for (int j = 0; j < h2Nodes; j++)
-         {
-            Omega_k += psi[H2][j] * w[H1][k][j];
-            w[H1][k][j] += lambda * a[H1][k] * psi[H2][j];
-         }
+         psi[n][j] = Omega_j * f.deriv(theta[n][j]);
          
-         psi[H1][k] = Omega_k * f.deriv(theta[H1][k]);
-
-         for (int m = 0; m < aNodes; m++)
-            w[A][m][k] += lambda * a[A][m] * psi[H1][k];
-      } // for (int k = 0; k < h1Nodes; k++)
+         for (int m = 0; m < numNodes[n - 1]; m++)
+            w[n - 1][m][j] += lambda * a[n - 1][m] * psi[n][j];
+      } // for (int j = 0; j < numNodes[n]; j++)
    } // void calculateGradientDescent(int testCase)
 
 @Deprecated
@@ -791,7 +757,11 @@ class ABCDNetwork
  */
    void reportResults()
    {
-      System.out.println("Network ran on "+numTestCases+" test cases and took "+time+" milliseconds.\n");
+      if (printKeepAlives)
+         System.out.println("-----------------------------------------------------------");
+   
+      System.out.print("Network ran on "+numTestCases+" test cases and took ");
+      printTime(time);
 
       if (train) reportTrainingInformation();
 
@@ -801,6 +771,50 @@ class ABCDNetwork
 
       if (printWeights) reportWeights();
    } // void reportResults()
+
+/**
+ * Accept a value representing milliseconds elapsed and print out a decimal value in easier to digest units
+ */
+void printTime(double milliseconds)
+{
+   double seconds, minutes, hours, days, weeks;
+
+   seconds = milliseconds / MS_PER_SEC;
+
+   if (seconds < MS_THRESHOLD)
+      System.out.printf("%g milliseconds", seconds * MS_PER_SEC);
+   else if (seconds < SEC_PER_MIN)
+      System.out.printf("%g seconds", seconds);
+   else
+   {
+      minutes = seconds / SEC_PER_MIN;
+
+      if (minutes < SEC_PER_MIN)
+         System.out.printf("%g minutes", minutes);
+      else
+      {
+         hours = minutes / MIN_PER_HR;
+
+         if (hours < HR_PER_DAY)
+            System.out.printf("%g hours", hours);
+         else
+         {
+            days = hours / HR_PER_DAY;
+
+            if (days < DAY_PER_WK)
+               System.out.printf("%g days", days);
+            else
+            {
+               weeks = days / DAY_PER_WK;
+
+               System.out.printf("%g weeks", weeks);
+            }
+         } // if (hours < HR_PER_DAY) else
+      } // if (minutes < MIN_PER_HR) else
+   } // else if (seconds < SEC_PER_MIN) else
+
+   System.out.printf("\n\n");
+} // void printTime(double milliseconds)
 
 /**
  * Prints out the reasons for training exiting and the iterations and error reached
@@ -828,21 +842,21 @@ class ABCDNetwork
  */
    void reportOutputs()
    {
-      for (int k = 0; k < aNodes; k++)
+      for (int k = 0; k < numNodes[A]; k++)
          System.out.print("a"+k+"  |");
 
       System.out.println("Outputs");
 
-      for (int k = 0; k < aNodes; k++)
+      for (int k = 0; k < numNodes[A]; k++)
          System.out.print("----|");
 
       System.out.println("-----------------------------");
       for (int testCase = 0; testCase < numTestCases; testCase++)
       {
-         for (int k = 0; k < aNodes; k++)
+         for (int k = 0; k < numNodes[A]; k++)
             System.out.print(testCases[testCase][k]+" |");
 
-         for (int i = 0; i < FNodes; i++)
+         for (int i = 0; i < numNodes[F]; i++)
             System.out.print(format(outputs[testCase][i])+" |");
 
          System.out.println();
@@ -854,34 +868,34 @@ class ABCDNetwork
  */
    void reportTruthTable()
    {
-      for (int k = 0; k < aNodes; k++)
+      for (int k = 0; k < numNodes[A]; k++)
       System.out.print("a"+k+"  |");
 
       System.out.println("|Truth         ||Outputs");
 
-      for (int k = 0; k < aNodes; k++)
+      for (int k = 0; k < numNodes[A]; k++)
          System.out.print("----|");
 
       System.out.print("|");
 
-      for (int i = 0; i < FNodes; i++)
+      for (int i = 0; i < numNodes[F]; i++)
          System.out.print("----|");
 
       System.out.println("|-----------------------------");
 
       for (int testCase = 0; testCase < numTestCases; testCase++)
       {
-         for (int k = 0; k < aNodes; k++)
+         for (int k = 0; k < numNodes[A]; k++)
             System.out.print(testCases[testCase][k]+" |");
 
          System.out.print("|");
 
-         for (int i = 0; i < FNodes; i++)
+         for (int i = 0; i < numNodes[F]; i++)
             System.out.print(truth[testCase][i]+" |");
 
          System.out.print("|");
 
-         for (int i = 0; i < FNodes; i++)
+         for (int i = 0; i < numNodes[F]; i++)
             System.out.print(format(outputs[testCase][i])+" |");
 
          System.out.println();
@@ -895,24 +909,17 @@ class ABCDNetwork
    {
       System.out.print("\n\nWeights:");
 
-      for (int m = 0; m < aNodes; m++)
-         for (int k = 0; k < h1Nodes; k++)
-            System.out.println("w"+A+m+k+": "+format(w[A][m][k]));
-      System.out.print("\n------------------------------------------------------------");
-
-      for (int k = 0; k < h1Nodes; k++)
-         for (int j = 0; j < h2Nodes; j++)
-            System.out.println("w"+H1+k+j+": "+format(w[H1][k][j]));
-      System.out.print("\n------------------------------------------------------------");
-
-      for (int j = 0; j < h2Nodes; j++)
-         for (int i = 0; i < FNodes; i++)
-            System.out.println("w"+H2+j+i+": "+format(w[H2][j][i]));
-      System.out.print("\n------------------------------------------------------------");
+      for (int n = 0; n < layers; n++)
+      {
+         for (int m = 0; m < numNodes[n]; m++)
+            for (int k = 0; k < numNodes[n + 1]; k++)
+               System.out.println("w"+n+m+k+": "+format(w[n][m][k]));
+         System.out.print("\n------------------------------------------------------------");
+      }
    } // void reportWeights()
 
 /**
- * Returns a formatted, twenty one character long string for a double so that all the doubles are aligned when displaying them
+ * Returns a formatted, twenty four character long string for a double so that all the doubles are aligned when displaying them
  */
    String format(double number)
    {
@@ -931,7 +938,7 @@ class ABCDNetwork
    } // String format(double number)
 
 /**
- * Main method tests the ABC network on each config file in order, uses "config.txt" if no config files given
+ * Main method tests the network on each config file in order, uses "config.txt" if no config files given
  */
    public static void main(String[] args)
    {
@@ -949,11 +956,11 @@ class ABCDNetwork
    } // public static void main(String[] args)
 
 /**
- * Creates an ABC network and executes all the major network arrays in order
+ * Creates a network and executes all the major network arrays in order
  */
    static void runNetwork(String configFile)
    {
-      ABCDNetwork network = new ABCDNetwork();
+      NLayerNetwork network = new NLayerNetwork();
       try
       {
          network.setConfigurationParameters(configFile);
@@ -970,4 +977,4 @@ class ABCDNetwork
          System.out.println(e);
       } // try catch (ValidationError e)
    } // static void runNetwork(String configFile)
-} // class AB1Network
+} // class NLayerNetwork
