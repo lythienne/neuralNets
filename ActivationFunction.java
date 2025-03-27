@@ -3,6 +3,11 @@
  * Date of Creation: 3/12/24
  * 
  * Abstract class for activation functions allows the user to select the activation function they want to use without changing the code
+ * 
+ * Table of Contents:
+ *    abstract double F(double x);
+ *    abstract double deriv(double x);
+ *    abstract String getName();
  */
 
 abstract class ActivationFunction 

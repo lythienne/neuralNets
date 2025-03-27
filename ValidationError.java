@@ -3,7 +3,10 @@
  * Date of Creation: 1/31/24
  * 
  * Validation error is an error thrown when encountering an invalid configuration parameter while echoing them.
- * An example would be setting the weights to be the preset for a 2-2-1 network while also asking for five input nodes.
+ * An example would be setting the weights to be the preset for a 2-2-1 network while also asking for five input nodes.\
+ * 
+ * Table of Contents:
+ *    public ValidationError(String reason)
  */
 public class ValidationError extends RuntimeException
 {

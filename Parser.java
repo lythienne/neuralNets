@@ -5,6 +5,14 @@ import java.util.Scanner;
  * Date of Creation: 3/12/24
  * 
  * Parser takes in one line of the config file and extracts its value
+ * 
+ * Table of Contents:
+ *    static String cleanString(String string)
+ *    static boolean setString(String line)
+ *    static int extractInt()
+ *    static int extractDouble()
+ *    static int extractBoolean()
+ *    static int extractString()
  */
 class Parser
 {

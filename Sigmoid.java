@@ -3,6 +3,11 @@
  * Date of Creation: 3/12/24
  * 
  * Sigmoid represents a sigmoid activation function
+ * 
+ * Table of Contents:
+ *    double F(double x);
+ *    double deriv(double x);
+ *    String getName();
  */
 class Sigmoid extends ActivationFunction
 {

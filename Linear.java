@@ -3,6 +3,11 @@
  * Date of Creation: 3/12/24
  * 
  * Linear represents a linear activation function (f(x) = x)
+ * 
+ * Table of Contents:
+ *    double F(double x);
+ *    double deriv(double x);
+ *    String getName();
  */
 class Linear extends ActivationFunction
 {
