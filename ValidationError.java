@@ -7,11 +7,12 @@
  */
 public class ValidationError extends RuntimeException
 {
+
 /**
  * The only constructor for Validation errors that should be used includes a reason for the error.
-*/
-    public ValidationError(String reason)
-    {
-        super(reason);
-    }
-}
+ */
+   public ValidationError(String reason)
+   {
+      super(reason);
+   }
+} // public class ValidationError extends RuntimeException

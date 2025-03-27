@@ -1,103 +1,118 @@
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 /**
  * Author: Harrison Chen
- * Date of Creation: 1/24/24
+ * Date of Creation: 2/21/24
  * 
- * The AB1Network class is an A-B-1 multilayer perceptron with gradient descent learning.
+ * The ABCNetwork class is an A-B-C multilayer perceptron with gradient descent learning.
  */
-class AB1Network
+class ABCNetwork
 {
-   final static int LAYERS = 2;                    //number of layers in the network
-   final static int DERIVATIVE_OF_X = 1;           //derivative of F(x) = x with respect to x
+   final static int LAYERS = 2;                       //number of layers in the network
+   final static int DERIVATIVE_OF_X = 1;              //derivative of F(x) = x with respect to x
 
-   final static int AND = 0;                       //tests the network against AND
-   final static int OR = 1;                        //tests the network against OR
-   final static int XOR = 2;                       //tests the network against XOR
+   final static int AND = 0;                          //tests the network against AND
+   final static int OR = 1;                           //tests the network against OR
+   final static int XOR = 2;                          //tests the network against XOR
 
-   final static int RANDOMIZE = 0;                 //randomly populates the weights
-   final static int TWO_TWO_ONE = 1;               //populates the weights with preset values for a 2-2-1 network
+   final static int RANDOMIZE = 0;                    //randomly populates the weights
+   final static int TWO_TWO_ONE = 1;                  //populates the weights with preset values for a 2-2-1 network
+   final static int LOAD_FROM_FILE = 2;               //populates the weights from a file
 
-   final static int[] PRESET_MODEL = {2, 2, 1};    //array constant that saves a 2-2-1 model to be checked against
-   final static int a_LAYER_INDEX = 0;             //index of the number of input nodes in the preset model
-   final static int h_LAYER_INDEX = 1;             //index of the number of hidden nodes in the preset model
-   final static int F_LAYER_INDEX = 2;             //index of the number of final node in the preset model
+   final static String WEIGHTS_FILE = "weights.bin";  //the name of the weights file
 
-   final static int NUM_TEST_CASES = 4;            //each test (AND, OR, XOR) has four test cases
+   final static int[] PRESET_MODEL = {2, 2, 1};       //array constant that saves a 2-2-1 model to be checked against
+   final static int a_LAYER_INDEX = 0;                //index of the number of input nodes in the preset model
+   final static int h_LAYER_INDEX = 1;                //index of the number of hidden nodes in the preset model
+   final static int F_LAYER_INDEX = 2;                //index of the number of final node in the preset model
 
-   final static int a0INDEX = 0;                   //index of the first input value in the test cases array
-   final static int a1INDEX = 1;                   //index of the second input value in the test cases array
+   final static int NUM_TEST_CASES = 4;               //each test (AND, OR, XOR) has four test cases
 
-   final static int MAX_WEIGHT_STRING_LENGTH = 20; //the maximum length the weight can be when printed so that they all line up
+   final static int a0INDEX = 0;                      //index of the first input value in the test cases array
+   final static int a1INDEX = 1;                      //index of the second input value in the test cases array
+
+   final static int MAX_WEIGHT_STRING_LENGTH = 24;    //the maximum length the weight can be when printed so that they all line up
 
 
 
    int aNodes;                   //no, this is not a chemistry class unfortunately, a nodes is the number of nodes in the input layer
    int hNodes;                   //number of nodes in the hidden layer
-   int FNodes;                   //number of nodes in the output layer (should be one)
+   int FNodes;                   //number of nodes in the output layer
 
    double[] a;                   //input activation layer
    double[] h;                   //hidden activation layer
-   double[] F;                   //output activation layer (should only have one value)
+   double[] F;                   //output activation layer
 
    boolean train;                //whether to train (true) or run (false)
-   int test;                     //AND, OR, or XOR
+   boolean saveWeights;          //whether to save the weights
 
    double errorThreshold;        //maximum average error for training to end
    int maxIterations;            //maximum number of training cycles before training times out
 
-   int weightPopulation;         //weight population method (randomized or 2-2-1 preset)
+   int weightPopulation;         //weight population method (randomized, 2-2-1 preset, or loaded from file)
    double randomLow;             //randomized weight low bound (inclusive)
    double randomHigh;            //randomized weight high bound (exclusive)
 
    double lambda;                //learning factor
 
    double[][] wkj;               //2d weights array for the n=1 layer
-   double[] wj0;                 //1d weights array for the n=2 layer (since theres only 1 output node)
+   double[][] wji;               //2d weights array for the n=2 layer
 
    double[] theta_j;             //1d dot products array for the n=1 layer
-   double theta_0;               //dot product for the n=2 layer
+   double[] theta_i;             //1d dot products array for the n=2 layer
 
    double[] Omega_j;             //1d array for the uppercase Omega intermediate values for the n=1 layer
-   double omega_0;               //lowercase omega value for the n=2 layer
+   double[] omega_i;             //1d array for the lowercase omega intermediate values for the n=2 layer
 
    double[] Psi_j;               //1d array for the uppercase Psi intermediate values for the n=1 layer
-   double psi_0;                 //lowercase psi value for the n=2 layer
+   double[] psi_i;               //1d array for the lowercase psi intermediate values for the n=2 layer
    
    double[][] partialE_by_wkj;   //2d array of the partial derivatives of E with respect to the 1kj weights (in the n=1 layer)
-   double[] partialE_by_wj0;     //1d array of the partial derivatives of E with respect to the 2j0 weights (in the n=2 layer)
+   double[][] partialE_by_wji;   //2d array of the partial derivatives of E with respect to the 2ji weights (in the n=2 layer)
 
    double[][] delta_wkj;         //2d array of the descents for each of the 1kj weights (in the n=1 layer)
-   double[] delta_wj0;           //1d array of the descents for each of the 2j0 weights (in the n=2 layer)
+   double[][] delta_wji;         //2d array of the descents for each of the 2ji weights (in the n=0 layer)
 
    int iterations;               //number of iterations in the current training session
    double avgError;              //average error from the previous iteration
 
-   double[][] testCases;         //2d array to store the two inputs for each of the four test cases
-   double[] truth;               //1d array to store the truth values for each test case
+   double[][] testCases;         //2d array to store the inputs for each test case
+   double[][] truth;             //2d array to store the truth values for each test case
 
    boolean printTruthTable;      //whether to print the truth table when reporting results
    boolean printWeights;         //whether to print the weights when reporting results
 
-   double[] outputs;             //stores the output (F0) values from the final iteration for each test case to report to the user
+   double[][] outputs;           //stores the output (F0) values from the final iteration for each test case to report to the user
+
+   static String origin;         //used by the error handler to save which major method threw the error
 
 /**
  * The user should set their values for the configuration parameters (that can be changed) here.
  */
    void setConfigurationParameters()
    {
-      aNodes = 2;
-      hNodes = 2;
-      FNodes = 1;
+      origin = "setConfigurationParameters";
 
-      test = XOR;                     //tests are: AND, OR, XOR
-      weightPopulation = RANDOMIZE;   //weight population methods are: RANDOMIZE, 2-2-1 
+      aNodes = 2;
+      hNodes = 5;
+      FNodes = 3;
+
+      weightPopulation = RANDOMIZE;   //weight population methods are: RANDOMIZE, TWO_TWO_ONE, LOAD_FROM_FILE
 
       train = true;                   //true = train network, false = run network
+      saveWeights = true;
       
       lambda = 0.3;
       errorThreshold = 0.0002;
       maxIterations = 100000;
   
-      randomLow = -1.5;
+      randomLow =  0.1;
       randomHigh = 1.5;
 
       printTruthTable = true; 
@@ -110,12 +125,11 @@ class AB1Network
  * 
  * Throws ValidationErrors if the user selected nonsensical parameters or parameters that do not match the A-B-1 model.
  */
-   void echoConfigurationParameters()
+   void echoConfigurationParameters() throws ValidationError
    {
-      System.out.println("-----------------------------------------------------------");
+      origin = "echoConfigurationParameters";
 
-      if (FNodes != PRESET_MODEL[F_LAYER_INDEX])   //check to see whether there is only one output node
-         throw new ValidationError("Number of output nodes in an A-B-1 network should be 1, not "+FNodes);
+      System.out.println("-----------------------------------------------------------");
 
       System.out.println("Configuration Parameters for a "+aNodes+"-"+hNodes+"-"+FNodes+" network with "+
             aNodes+" input nodes, "+hNodes+" hidden layer nodes, and "+ FNodes+" output node:\n");
@@ -124,7 +138,7 @@ class AB1Network
       switch (weightPopulation)
       {
          case RANDOMIZE:
-            if(randomLow > randomHigh) 
+            if (randomLow > randomHigh) 
                throw new ValidationError("Random low bound should be lower than the random high bound.");
             else
                System.out.println("Randomizing weights from "+randomLow+" to "+randomHigh);
@@ -142,30 +156,30 @@ class AB1Network
                throw new ValidationError("Using 2-2-1 preset weights, number of input nodes should be 2, not "+aNodes);
             break; // case TWO_TWO_ONE:
 
+         case LOAD_FROM_FILE:
+            File file = new File(WEIGHTS_FILE);
+            if (!file.isFile())
+            {
+               throw new ValidationError("Weights file "+WEIGHTS_FILE+" does not exist."
+                     + "You probably chose to load in weights instead of randomizing the weights.");
+            }
+            break;
+
          default:
             throw new ValidationError("Please select a valid weight population method.");
       } // switch (weightPopulation)
 
       System.out.println();   //print another line for clarity
 
-      String testName;        //convert integer to name to print
-      switch (test)
-      {
-         case AND: testName = "AND"; break;
-         case OR: testName = "OR"; break;
-         case XOR: testName = "XOR"; break;
-         default: throw new ValidationError("Please select a valid test (0 = AND, 1 = OR, 2 = XOR)");
-      }
-
       if (train)
       {
-         System.out.println("Network is training for "+testName+". \n\nRuntime Training Parameters:");
+         System.out.println("Network is training for on AND, OR, and XOR. \n\nRuntime Training Parameters:");
          System.out.println(" - Max Iterations: "+maxIterations);
          System.out.println(" - Error Threshold: "+errorThreshold);
          System.out.println(" - Lambda Value: "+lambda);
       }
       else
-         System.out.println("Network is running against "+testName+".");
+         System.out.println("Network is running against AND, OR, and XOR.");
 
       System.out.println("-----------------------------------------------------------"); //print a separator for clarity
    } // void echoConfigurationParameters()
@@ -175,30 +189,36 @@ class AB1Network
  */
    void allocateMemory()
    {
+      origin = "allocateMemory";
+
       a = new double[aNodes];
       h = new double[hNodes];
       F = new double[FNodes];
 
       wkj = new double[aNodes][hNodes];
-      wj0 = new double[hNodes];
+      wji = new double[hNodes][FNodes];
 
-      truth = new double[NUM_TEST_CASES];
+      truth = new double[NUM_TEST_CASES][FNodes];
       testCases = new double[NUM_TEST_CASES][aNodes];
 
-      outputs = new double[NUM_TEST_CASES];
+      outputs = new double[NUM_TEST_CASES][FNodes];
 
       if (train)
       {
          theta_j = new double[hNodes];
+         theta_i = new double[FNodes];
 
          Omega_j = new double[hNodes];
+         omega_i = new double[FNodes];
+
          Psi_j = new double[hNodes];
+         psi_i = new double[FNodes];
 
          partialE_by_wkj = new double[aNodes][hNodes];
-         partialE_by_wj0 = new double[hNodes];
+         partialE_by_wji = new double[hNodes][FNodes];
 
          delta_wkj = new double[aNodes][hNodes];
-         delta_wj0 = new double[hNodes];
+         delta_wji = new double[hNodes][FNodes];
 
       } // if (train)
    } // void allocateMemory()
@@ -208,21 +228,30 @@ class AB1Network
  * 
  * Arrays that were allocated space but are not populated here all contain 0.0 or the default primitive value java assigns.
  */
-   void populateArrays()
+   void populateArrays() throws FileNotFoundException, IOException
    {
-      if (weightPopulation == RANDOMIZE)
-      {
-         for (int k = 0; k < aNodes; k++)
-            for (int j = 0; j < hNodes; j++)
-               wkj[k][j] = randomize(randomLow, randomHigh);
+      origin = "populateArrays";
 
-         for (int j = 0; j < hNodes; j++)
-            wj0[j] = randomize(randomLow, randomHigh);
-      }
-      else
+      switch(weightPopulation)
       {
-         populateWeights();
-      }
+         case RANDOMIZE:
+            for (int k = 0; k < aNodes; k++)
+               for (int j = 0; j < hNodes; j++)
+                  wkj[k][j] = randomize(randomLow, randomHigh);
+
+            for (int j = 0; j < hNodes; j++)
+               for (int i = 0; i < FNodes; i++)
+                  wji[j][i] = randomize(randomLow, randomHigh);
+            break;
+
+         case LOAD_FROM_FILE:
+            loadWeights();
+            break;
+
+         default:
+            populateWeightsManually();
+            break;
+      } // switch(weightPopulation)
 
       testCases[0][0] = 0.0;
       testCases[0][1] = 0.0;
@@ -238,52 +267,94 @@ class AB1Network
 
       populateTruthTable();
 
-   } // void populateArrays()
+   } // void populateArrays() throws FileNotFoundException, IOException
 
 /**
  * Manually populates weights for a 2-2-1 network into the weights arrays
  */
-   void populateWeights()
+   void populateWeightsManually()
    {
       wkj[0][0] = 0.2;
       wkj[0][1] = 0.243;
       wkj[1][0] = 0.1;
       wkj[1][1] = 0.353;
 
-      wj0[0] = 0.757;
-      wj0[1] = 0.75;
+      wji[0][0] = 0.75;
+      wji[1][0] = 0.757;
 
-   } // void populateWeights()
+   } // void populateWeightsManually()
+
+/**
+ * Saves the weights in binary to a file
+ */
+   void saveWeights() throws FileNotFoundException, IOException
+   {
+      File file = new File(WEIGHTS_FILE);
+      DataOutputStream out = new DataOutputStream(new FileOutputStream(file));
+
+      for (int k = 0; k < aNodes; k++)
+         for (int j = 0; j < hNodes; j++)
+            out.writeDouble(wkj[k][j]);
+
+      for (int j = 0; j < hNodes; j++)
+         for (int i = 0; i < FNodes; i++)
+            out.writeDouble(wji[j][i]);
+      
+      out.close();
+
+   } // void saveWeights() throws FileNotFoundException, IOException
+
+/**
+ * Loads the weights in binary from a file
+ */
+   void loadWeights() throws FileNotFoundException, IOException
+   {
+      File file = new File(WEIGHTS_FILE);
+      DataInputStream in = new DataInputStream(new FileInputStream(file));
+
+      for (int k = 0; k < aNodes; k++)
+         for (int j = 0; j < hNodes; j++)
+            wkj[k][j] = in.readDouble();
+
+      for (int j = 0; j < hNodes; j++)
+         for (int i = 0; i < FNodes; i++)
+            wji[j][i] = in.readDouble();
+      
+      in.close();
+
+   } // void loadWeights() throws FileNotFoundException, IOException
 
 /**
  * Manually populates the truth table with the current test's (AND, OR, XOR) truth table
  */
+   void oldpopulateTruthTable()
+   {
+      truth[0][0] = 0.0;
+      truth[1][0] = 1.0;
+      truth[2][0] = 1.0;
+      truth[3][0] = 0.0;
+
+   } // void oldpopulateTruthTable()
+
+/**
+ * Manually populates the truth table with the current tests' (AND, OR, XOR) truth tables
+ */
    void populateTruthTable()
    {
-      switch (test)
-      {
-         case AND:
-            truth[0] = 0.0;
-            truth[1] = 0.0;
-            truth[2] = 0.0;
-            truth[3] = 1.0;
-            break;
+      truth[0][AND] = 0.0;
+      truth[1][AND] = 0.0;
+      truth[2][AND] = 0.0;
+      truth[3][AND] = 1.0;
+      
+      truth[0][OR] = 0.0;
+      truth[1][OR] = 1.0;
+      truth[2][OR] = 1.0;
+      truth[3][OR] = 1.0;
 
-         case OR:
-            truth[0] = 0.0;
-            truth[1] = 1.0;
-            truth[2] = 1.0;
-            truth[3] = 1.0;
-            break;
-
-         case XOR:
-            truth[0] = 0.0;
-            truth[1] = 1.0;
-            truth[2] = 1.0;
-            truth[3] = 0.0;
-            break;
-
-      } // switch (test)
+      truth[0][XOR] = 0.0;
+      truth[1][XOR] = 1.0;
+      truth[2][XOR] = 1.0;
+      truth[3][XOR] = 0.0;
    } // void populateTruthTable()
 
 /**
@@ -298,7 +369,7 @@ class AB1Network
  * Trains or runs the neural network based on the user's selected mode. Activations are calculated with a sigmoid
  * activation function, while training uses gradient descent with changes in weights all applied simultaneously.
  */
-   void trainOrRun()
+   void trainOrRun() throws FileNotFoundException, IOException
    {
       if (train)
       {
@@ -314,26 +385,29 @@ class AB1Network
                runTestCase(testCase);
                calculateGradientDescent(testCase);
                applyGradientDescent();
-               runTestCase(testCase);
             }
 
             iterations++;
-            avgError = avgError / (double) NUM_TEST_CASES;
+            avgError = avgError / NUM_TEST_CASES;
 
          } // while (iterations < maxIterations && error < maxAvgError)
 
-         for(int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
+         for (int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
             runTestCase(testCase);
+
+         if (saveWeights) saveWeights();
 
       } // if (train)
       else
+      {
          for (int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
             runTestCaseWithoutSaving(testCase);
-   } // void trainOrRun()
+      } // if (train) else
+   } // void trainOrRun() throws FileNotFoundException, IOException
 
 /**
  * Runs the network for one test case, calculating the values of all the hidden nodes and the output node
- * does not save the dot products since it is not needed when only running
+ * does not save the dot products since they are not needed when only running
  */
    void runTestCaseWithoutSaving(int testCase)
    {
@@ -349,15 +423,18 @@ class AB1Network
             theta += a[k] * wkj[k][j];
 
          h[j] = activationFunction(theta);
-      }
+      } // for (int j = 0; j < hNodes; j++) 
 
-      theta = 0.0;
+      for (int i = 0; i < FNodes; i++)
+      {
+         theta = 0.0;
 
-      for (int j = 0; j < hNodes; j++)              //iterate over the hidden nodes to calculate their dot product
-         theta += h[j] * wj0[j];
+         for (int j = 0; j < hNodes; j++)            //iterate over the hidden nodes to calculate their dot product
+            theta += h[j] * wji[j][i];
 
-      F[0] = activationFunction(theta);
-      outputs[testCase] = F[0];                     //store output in outputs array to be later reported
+         F[i] = activationFunction(theta);
+         outputs[testCase][i] = F[i];                //store output in outputs array to be later reported
+      } // for (int i = 0; i < FNodes; j++) 
 
    } // void runTestCaseWithoutSaving(int testCase)
 
@@ -376,15 +453,18 @@ class AB1Network
             theta_j[j] += a[k] * wkj[k][j];
 
          h[j] = activationFunction(theta_j[j]);
-      }
+      } // for (int j = 0; j < hNodes; j++) 
 
-      theta_0 = 0.0;
+      for (int i = 0; i < FNodes; i++)
+      {
+         theta_i[i] = 0.0;
 
-      for (int j = 0; j < hNodes; j++)              //iterate over the hidden nodes to calculate their dot product
-         theta_0 += h[j] * wj0[j];
+         for (int j = 0; j < hNodes; j++)           //iterate over the hidden nodes to calculate their dot product
+            theta_i[i] += h[j] * wji[j][i];
 
-      F[0] = activationFunction(theta_0);
-      outputs[testCase] = F[0];                     //store output in outputs array to be later reported
+         F[i] = activationFunction(theta_i[i]);
+         outputs[testCase][i] = F[i];               //store output in outputs array to be later reported
+      } // for (int i = 0; i < FNodes; j++) 
 
    } // void runTestCase(int testCase)
 
@@ -402,18 +482,28 @@ class AB1Network
  */
    void calculateGradientDescent(int testCase)
    {
-      omega_0 = truth[testCase] - F[0];
-      psi_0 = omega_0 * derivative(theta_0);
+      for (int i = 0; i < FNodes; i++)
+      {
+         omega_i[i] = truth[testCase][i] - F[i];
+         psi_i[i] = omega_i[i] * derivative(theta_i[i]);
 
-      avgError += omega_0 * omega_0 / 2.0;
+         avgError += omega_i[i] * omega_i[i] / 2.0;
+
+      } // for (int i = 0; i < FNodes; i++)
 
       for (int j = 0; j < hNodes; j++)       //iterate over hidden nodes to calculate j0 intermediates
       {
-         Omega_j[j] = psi_0 * wj0[j];
-         Psi_j[j] = Omega_j[j] * derivative(theta_j[j]);
+         Omega_j[j] = 0.0;
 
-         partialE_by_wj0[j] = -h[j] * psi_0;
-         delta_wj0[j] = -lambda * partialE_by_wj0[j];
+         for (int i = 0; i < FNodes; i++)
+         {
+            Omega_j[j] += psi_i[i] * wji[j][i];
+
+            partialE_by_wji[j][i] = -h[j] * psi_i[i];
+            delta_wji[j][i] = -lambda * partialE_by_wji[j][i];
+         }
+         
+         Psi_j[j] = Omega_j[j] * derivative(theta_j[j]);
 
          for (int k = 0; k < aNodes; k++)    //iterate over input nodes as well to calculate kj intermediates
          {
@@ -430,10 +520,11 @@ class AB1Network
    {
       for (int j = 0; j < hNodes; j++)       //iterate over hidden nodes to update the j0 weights
       {
-         wj0[j] += delta_wj0[j];
-
          for (int k = 0; k < aNodes; k++)    //iterate over input nodes to update the kj weights
             wkj[k][j] += delta_wkj[k][j];
+         
+         for (int i = 0; i< FNodes; i++)
+            wji[j][i] += delta_wji[j][i];
       }
    } // void applyGradientDescent()
 
@@ -495,33 +586,63 @@ class AB1Network
 
          System.out.println(" - Iterations reached: "+iterations);
          System.out.println(" - Average error: "+avgError+"\n");
-      }  // if (train)
+      } // if (train)
 
       System.out.println("Results:\n");      //print the outputs (and truth table)
       if (printTruthTable)
       {
-         System.out.println("a0 |a1 |Truth|Output");
-         System.out.println("---|---|-----|-------------------");
+         for (int k = 0; k < aNodes; k++)
+            System.out.print("a"+k+"  |");
+
+         System.out.println("Truth         |Outputs");
+
+         for (int k = 0; k < aNodes; k++)
+            System.out.print("----|");
+
+         for (int i = 0; i < FNodes; i++)
+            System.out.print("----|");
+
+         System.out.println("-----------------------------");
+
          for (int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
-            System.out.println(testCases[testCase][0]+"|"+testCases[testCase][1]+"|"+truth[testCase]+"  |"+(outputs[testCase])+"");
+         {
+            for (int k = 0; k < aNodes; k++)
+               System.out.print(testCases[testCase][k]+" |");
+            for (int i = 0; i < FNodes; i++)
+               System.out.print(truth[testCase][i]+" |");
+            for (int i = 0; i < FNodes; i++)
+               System.out.print(format(outputs[testCase][i])+" |");
+            System.out.println();
+         } // for (int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
       }
       else
       {
-         System.out.println("a0 |a1 |Output");
-         System.out.println("---|---|-------------------");
+         for (int k = 0; k < aNodes; k++)
+            System.out.print("a"+k+"  |");
+         System.out.println("Outputs");
+         for (int k = 0; k < aNodes; k++)
+            System.out.print("----|");
+         System.out.println("-----------------------------");
          for (int testCase = 0; testCase < NUM_TEST_CASES; testCase++)
-            System.out.println(testCases[testCase][0]+"|"+testCases[testCase][1]+"|"+(outputs[testCase])+"");
-      }
+         {
+            for (int k = 0; k < aNodes; k++)
+               System.out.print(testCases[testCase][k]+" |");
+            for (int i = 0; i < FNodes; i++)
+               System.out.print(format(outputs[testCase][i])+" |");
+            System.out.println();
+         }
+      } // if (printTruthTable) else
 
-      if (printWeights)                         //print the weights (possibly)
+      if (printWeights)          //print the weights (possibly)
       {
          System.out.println("\n\nWeights:");
          for (int j = 0; j < hNodes; j++)
          {
             for (int k = 0; k < aNodes; k++)
                System.out.print("\nw1"+k+j+": "+format(wkj[k][j]));
-            
-            System.out.print("  |w2"+j+"0: "+format(wj0[j]));
+
+            for (int i = 0; i < FNodes; i++)
+               System.out.print("  |w2"+j+"0: "+format(wji[j][i])+"\n");
             System.out.print("\n----------------------------------------------------------");
          }
          System.out.println();   //print a newline for clarity
@@ -544,4 +665,27 @@ class AB1Network
       if (weight > 0) return " "+weightString; else return "-"+weightString; //add a space or the negative sign back in
 
    } // String format(double weight)
+
+/**
+ * Main method creates an ABCNetwork, then executes each of its major methods in order to test the network.
+ */
+   public static void main(String[] args) throws FileNotFoundException, IOException
+   {
+      ABCNetwork network = new ABCNetwork();
+      network.setConfigurationParameters();
+      try
+      {
+         network.echoConfigurationParameters();
+         network.allocateMemory();
+         network.populateArrays();
+         network.trainOrRun();
+         network.reportResults();
+      } // try
+      catch (ValidationError e)
+      {
+         System.out.println("\nError caught in "+origin);
+         System.out.println(e);
+      } // try catch (ValidationError e)
+
+   } // public static void main(String[] args) throws FileNotFoundException, IOException
 } // class AB1Network
